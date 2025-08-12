@@ -67,7 +67,36 @@ except sqlite3.Error as error:
 
 # Upload via Wi-Fi
 if uploadTechnology.lower() == "wifi":
-    publish_mqtt_message(detected_devices, f"sttoolkit/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+
+    dataAtual_unix = int(dataAtual.timestamp())
+
+    mqtt_confirmation = publish_detections_mqtt_message(dataAtual_unix, detected_devices, f"sttoolkit/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+
+    if mqtt_confirmation is True:
+
+        # Check if exists a pending measurement to send
+        while get_1st_pending_measurement() is not None:
+
+            # Send first pending measurement from database, and wait for its confirmation
+            unix_ts = get_1st_pending_measurement()[0]
+            devices_detected = get_1st_pending_measurement()[1]
+
+            mqtt_pend_confirmation = publish_detections_mqtt_message(unix_ts, detected_devices, f"sttoolkit/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+
+            if mqtt_pend_confirmation is True:
+                # Remove first pending measurement from database
+                remove_1st_pending_measurement()
+                continue
+            else:
+                break
+
+
+elif uploadTechnology.lower() == "none":
+    dataAtual_unix = int(dataAtual.timestamp())
+
+    print("\nFailed to publish mqtt message.")
+    # Save measurement in database
+    store_pending_measurement(dataAtual_unix, detected_devices)
 
 # Upload via LoRa
 elif uploadTechnology.lower() == "lora":

@@ -6,6 +6,7 @@ import netifaces as ni
 import time
 from paho.mqtt import client as mqtt_client
 import random
+import json
 
 
 #           sensorConfiguration.py
@@ -554,7 +555,7 @@ def check_upload_detection_interfaces(start_monitor_mode:bool):
 
     return upload_interface, detection_interface
 
-def publish_mqtt_message(msg_payload, topic):
+def publish_location_mqtt_message(msg_payload, topic):
     client = connect_mqtt()
 
     result = client.publish(topic, msg_payload)
@@ -567,6 +568,73 @@ def publish_mqtt_message(msg_payload, topic):
     else:
         print("\nFailed to publish mqtt message.")
         return False
+    
+
+def publish_detections_mqtt_message(unix_timestamp, devices_detected: int, topic):
+    client = connect_mqtt()
+
+    msg_payload = {
+        "timestamp": unix_timestamp,
+        "devices_detected": int(devices_detected)
+    }
+
+    json_msg_payload = json.dumps(msg_payload, separators=(",", ":"))
+
+    result = client.publish(topic, json_msg_payload)
+
+    # result: [0, 1]
+    status = result[0]
+    if status == 0:
+        print(f"Send `{msg_payload}` to topic `{topic}`.")
+        return True
+    else:
+        print("\nFailed to publish mqtt message.")
+        # Save measurement in database
+        store_pending_measurement(unix_timestamp, devices_detected)
+        return False
+
+
+# Insert pending measurement in database
+def store_pending_measurement(unix_timestamp, devices_detected):
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    cursor.execute("""INSERT INTO PendingMeasurements VALUES (?, ?) """, (unix_timestamp, devices_detected))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print(f"Measurement '({unix_timestamp},{devices_detected})' stored in the database.")
+
+
+# Get first pending measurement from database
+def get_1st_pending_measurement():
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    
+    first_row = cursor.execute("""SELECT * FROM PendingMeasurements ORDER BY Timestamp ASC LIMIT 1 """).fetchone()
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if first_row is None:
+        # No pending measurements, database is empty
+        print("There are no pending measurements, database is empty.")
+        return None
+    else:
+        return first_row
+        
+
+# Remove first pending measurement from database
+def remove_1st_pending_measurement():
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    
+    cursor.execute("""DELETE FROM PendingMeasurements WHERE Timestamp IN (SELECT Timestamp FROM PendingMeasurements ORDER BY Timestamp ASC LIMIT 1)""")
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
 
 def check_config_mode():
     configuration_mode = ''
