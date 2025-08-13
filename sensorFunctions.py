@@ -568,7 +568,6 @@ def publish_location_mqtt_message(msg_payload, topic):
     else:
         print("\nFailed to publish mqtt message.")
         return False
-    
 
 def publish_detections_mqtt_message(unix_timestamp, devices_detected: int, topic):
     client = connect_mqtt()
@@ -592,7 +591,6 @@ def publish_detections_mqtt_message(unix_timestamp, devices_detected: int, topic
         # Save measurement in database
         store_pending_measurement(unix_timestamp, devices_detected)
         return False
-
 
 # Insert pending measurement in database
 def store_pending_measurement(unix_timestamp, devices_detected):

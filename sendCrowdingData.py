@@ -27,7 +27,7 @@ try:
 
         if uploadTechnology.lower() == "wifi":
             ip_address = cwifi.execute("""SELECT IP_Address FROM SensorCommunication""").fetchone()[0]
-
+            wifi_connected = cwifi.execute("""SELECT WifiConnected FROM SensorCommunication""").fetchone()[0]
 
     else:
         print("Sensor is not currently configured. It is required a cloud IP address to connect to the cloud server via MQTT.\nPlease run the 'sensorConfiguration.py' script to configure the sensor.")
@@ -67,7 +67,7 @@ except sqlite3.Error as error:
 
 
 # Upload via Wi-Fi
-if uploadTechnology.lower() == "wifi":
+if uploadTechnology.lower() == "wifi" and wifi_connected:
 
     dataAtual_unix = int(dataAtual.timestamp())
 
@@ -82,7 +82,7 @@ if uploadTechnology.lower() == "wifi":
             unix_ts = get_1st_pending_measurement()[0]
             devices_detected = get_1st_pending_measurement()[1]
 
-            mqtt_pend_confirmation = publish_detections_mqtt_message(unix_ts, detected_devices, f"sttoolkit-test/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+            mqtt_pend_confirmation = publish_detections_mqtt_message(unix_ts, devices_detected, f"sttoolkit-test/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
 
             if mqtt_pend_confirmation is True:
                 # Remove first pending measurement from database
@@ -91,13 +91,6 @@ if uploadTechnology.lower() == "wifi":
             else:
                 break
 
-
-elif uploadTechnology.lower() == "none":
-    dataAtual_unix = int(dataAtual.timestamp())
-
-    print("\nFailed to publish mqtt message.")
-    # Save measurement in database
-    store_pending_measurement(dataAtual_unix, detected_devices)
 
 # Upload via LoRa
 elif uploadTechnology.lower() == "lora":
@@ -278,6 +271,12 @@ else:
     print("WARNING: No communication available for sending crowding measurements! \n\
         Please check the network conectivity for uploading data to the cloud server.")
 
+    dataAtual_unix = int(dataAtual.timestamp())
+
+    print("\nFailed to publish mqtt message.")
+    print("\nSaving detection in database to send later, when conection available.")
+    #save measurement in database
+    store_pending_measurement(dataAtual_unix, detected_devices)
 
 cwifi.close()
 connwifi.close()
