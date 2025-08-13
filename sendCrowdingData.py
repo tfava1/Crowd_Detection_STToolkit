@@ -38,7 +38,8 @@ except sqlite3.Error as error:
     exit(0)
 
 
-dataAtual=dt.datetime.now(pytz.utc).replace(tzinfo=None)
+#dataAtual=dt.datetime.now(pytz.utc).replace(tzinfo=None)
+dataAtual=dt.datetime.now(pytz.utc)
 dataAnalizar= dataAtual - dt.timedelta(minutes=int(slidingWindow))
 
 
@@ -70,7 +71,7 @@ if uploadTechnology.lower() == "wifi":
 
     dataAtual_unix = int(dataAtual.timestamp())
 
-    mqtt_confirmation = publish_detections_mqtt_message(dataAtual_unix, detected_devices, f"sttoolkit/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+    mqtt_confirmation = publish_detections_mqtt_message(dataAtual_unix, detected_devices, f"sttoolkit-test/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
 
     if mqtt_confirmation is True:
 
@@ -81,7 +82,7 @@ if uploadTechnology.lower() == "wifi":
             unix_ts = get_1st_pending_measurement()[0]
             devices_detected = get_1st_pending_measurement()[1]
 
-            mqtt_pend_confirmation = publish_detections_mqtt_message(unix_ts, detected_devices, f"sttoolkit/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+            mqtt_pend_confirmation = publish_detections_mqtt_message(unix_ts, detected_devices, f"sttoolkit-test/mqtt/wifi/numdetections/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
 
             if mqtt_pend_confirmation is True:
                 # Remove first pending measurement from database
