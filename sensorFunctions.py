@@ -6,6 +6,7 @@ import netifaces as ni
 import time
 from paho.mqtt import client as mqtt_client
 import random
+import json
 
 
 #           sensorConfiguration.py
@@ -268,8 +269,8 @@ def config_influx():
     print("------------------------------------------------------------------")
 
     cloudServerIPAddress = input("Cloud Server IP Address: ").strip()
-    while validate_IP_address(cloudServerIPAddress) is not True:
-        cloudServerIPAddress = input("Cloud Server IP Address: ").strip()
+    #while validate_IP_address(cloudServerIPAddress) is not True:
+    #    cloudServerIPAddress = input("Cloud Server IP Address: ").strip()
     influxDB_Org_Name = input("InfluxDB Organization name: ").strip()
     influxDB_Bucket = input("InfluxDB Bucket name: ").strip()
     authorization_Token = input("Authorization token: ").strip()
@@ -435,6 +436,7 @@ def write_crontab_file(status, detection_if, upload_periodicity, reboot_periodic
         f.write("*/10 * * * * sleep 595 && sudo pkill airodump-ng\n")
         f.write("# Periodic upload of crowding data to the Cloud Server\n")
         f.write("*/" + str(upload_periodicity) + " * * * * /usr/bin/python3 /home/kali/Desktop/sendCrowdingData.py \n")
+        f.write("*/" + str(30) + " * * * * /usr/bin/python3 /home/kali/Desktop/sendCrowdingData_30min.py \n")
         f.write("# Periodic delete of outdated and unnecessary data from local database\n")
         f.write("0 * * * * /usr/bin/python3 /home/kali/Desktop/dataRetentionManager.py 30\n")
     elif status == "Disabled":
@@ -443,6 +445,7 @@ def write_crontab_file(status, detection_if, upload_periodicity, reboot_periodic
         f.write("#*/10 * * * * sleep 595 && sudo pkill airodump-ng\n")
         f.write("# Periodic upload of crowding data to the Cloud Server\n")
         f.write("#*/" + str(upload_periodicity) + " * * * * /usr/bin/python3 /home/kali/Desktop/sendCrowdingData.py \n")
+        f.write("#*/" + str(30) + " * * * * /usr/bin/python3 /home/kali/Desktop/sendCrowdingData_30min.py \n")
         f.write("# Periodic delete of outdated and unnecessary data from local database\n")
         f.write("#0 * * * * /usr/bin/python3 /home/kali/Desktop/dataRetentionManager.py 30\n")
     f.write("# Periodic upload of OUI list\n")
@@ -554,7 +557,7 @@ def check_upload_detection_interfaces(start_monitor_mode:bool):
 
     return upload_interface, detection_interface
 
-def publish_mqtt_message(msg_payload, topic):
+def publish_location_mqtt_message(msg_payload, topic):
     client = connect_mqtt()
 
     result = client.publish(topic, msg_payload)
@@ -567,6 +570,111 @@ def publish_mqtt_message(msg_payload, topic):
     else:
         print("\nFailed to publish mqtt message.")
         return False
+
+def publish_detections_mqtt_message(unix_timestamp, devices_detected: int, topic):
+    client = connect_mqtt()
+
+    msg_payload = {
+        "timestamp": unix_timestamp,
+        "devices_detected": int(devices_detected)
+    }
+
+    json_msg_payload = json.dumps(msg_payload, separators=(",", ":"))
+
+    result = client.publish(topic, json_msg_payload)
+
+    # result: [0, 1]
+    status = result[0]
+    if status == 0:
+        print(f"Send `{msg_payload}` to topic `{topic}`.")
+        return True
+    else:
+        print("\nFailed to publish mqtt message.")
+        # Save measurement in database
+        store_pending_measurement(unix_timestamp, devices_detected)
+        return False
+
+# Insert pending measurement in database
+def store_pending_measurement(unix_timestamp, devices_detected):
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    cursor.execute("""INSERT INTO PendingMeasurements VALUES (?, ?) """, (unix_timestamp, devices_detected))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print(f"Measurement '({unix_timestamp},{devices_detected})' stored in the database.")
+
+# Insert pending measurement in database (30min)
+def store_pending_measurement_30_min(unix_timestamp, devices_detected):
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    cursor.execute("""INSERT INTO PendingMeasurements_30min VALUES (?, ?) """, (unix_timestamp, devices_detected))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print(f"Measurement '({unix_timestamp},{devices_detected})' stored in the database (Table 'PendingMeasurements_30min').")
+
+
+# Get first pending measurement from database
+def get_1st_pending_measurement():
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    
+    first_row = cursor.execute("""SELECT * FROM PendingMeasurements ORDER BY Timestamp ASC LIMIT 1 """).fetchone()
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if first_row is None:
+        # No pending measurements, database is empty
+        print("There are no pending measurements, database is empty.")
+        return None
+    else:
+        return first_row
+
+
+# Get first pending measurement from database (30min)
+def get_1st_pending_measurement_30_min():
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    
+    first_row = cursor.execute("""SELECT * FROM PendingMeasurements_30min ORDER BY Timestamp ASC LIMIT 1 """).fetchone()
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if first_row is None:
+        # No pending measurements, database is empty
+        print("There are no pending measurements, database is empty (Table 'PendingMeasurements_30min').")
+        return None
+    else:
+        return first_row
+
+# Remove first pending measurement from database
+def remove_1st_pending_measurement():
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    
+    cursor.execute("""DELETE FROM PendingMeasurements WHERE Timestamp IN (SELECT Timestamp FROM PendingMeasurements ORDER BY Timestamp ASC LIMIT 1)""")
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+# Remove first pending measurement from database (30min)
+def remove_1st_pending_measurement_30_min():
+    conn = sqlite3.connect('/home/kali/Desktop/DB/StoredMeasurements.db' , timeout=30)
+    cursor = conn.cursor()
+    
+    cursor.execute("""DELETE FROM PendingMeasurements_30min WHERE Timestamp IN (SELECT Timestamp FROM PendingMeasurements_30min ORDER BY Timestamp ASC LIMIT 1)""")
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
 
 def check_config_mode():
     configuration_mode = ''

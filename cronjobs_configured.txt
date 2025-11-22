@@ -8,13 +8,14 @@
 # Periodic check of communication technologies and interfaces
 */5 * * * * /usr/bin/python3 /home/kali/Desktop/sensorCommunicationCheck.py
 # Wi-Fi detection of devices
-*/10 * * * * timeout -k 1 590s sudo airodump-ng --background 1 wlan1
+*/10 * * * * timeout -k 1 590s sudo airodump-ng --background 1 wlan0
 */10 * * * * sleep 595 && sudo pkill airodump-ng
 # Periodic upload of crowding data to the Cloud Server
 */5 * * * * /usr/bin/python3 /home/kali/Desktop/sendCrowdingData.py 
+*/30 * * * * /usr/bin/python3 /home/kali/Desktop/sendCrowdingData_30min.py 
 # Periodic delete of outdated and unnecessary data from local database
 0 * * * * /usr/bin/python3 /home/kali/Desktop/dataRetentionManager.py 30
 # Periodic upload of OUI list
 0 0 * * 0 /usr/bin/python3 /home/kali/Desktop/macOUIupdater.py
 # Reboot
-0 4 * * * sudo reboot
+0 3 * * * sudo reboot

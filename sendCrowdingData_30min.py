@@ -40,7 +40,7 @@ except sqlite3.Error as error:
 
 #dataAtual=dt.datetime.now(pytz.utc).replace(tzinfo=None)
 dataAtual=dt.datetime.now(pytz.utc)
-dataAnalizar= dataAtual - dt.timedelta(minutes=int(slidingWindow))
+dataAnalizar= dataAtual - dt.timedelta(minutes=30)
 
 
 # Get number of devices detected from database
@@ -71,22 +71,22 @@ if uploadTechnology.lower() == "wifi" and wifi_connected:
 
     dataAtual_unix = int(dataAtual.timestamp())
 
-    mqtt_confirmation = publish_detections_mqtt_message(dataAtual_unix, detected_devices, f"sttoolkit/mqtt/wifi/numdetectionstable/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+    mqtt_confirmation = publish_detections_mqtt_message(dataAtual_unix, detected_devices, f"sttoolkit/mqtt/wifi/numdetectionstable30min/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
 
     if mqtt_confirmation is True:
 
         # Check if exists a pending measurement to send
-        while get_1st_pending_measurement() is not None:
+        while get_1st_pending_measurement_30_min() is not None:
 
             # Send first pending measurement from database, and wait for its confirmation
-            unix_ts = get_1st_pending_measurement()[0]
-            devices_detected = get_1st_pending_measurement()[1]
+            unix_ts = get_1st_pending_measurement_30_min()[0]
+            devices_detected = get_1st_pending_measurement_30_min()[1]
 
-            mqtt_pend_confirmation = publish_detections_mqtt_message(unix_ts, devices_detected, f"sttoolkit/mqtt/wifi/numdetectionstable/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
+            mqtt_pend_confirmation = publish_detections_mqtt_message(unix_ts, devices_detected, f"sttoolkit/mqtt/wifi/numdetectionstable30min/{influxdb_bucket}/{ip_address}/{sensorName}/{sensorUUID}")
 
             if mqtt_pend_confirmation is True:
                 # Remove first pending measurement from database
-                remove_1st_pending_measurement()
+                remove_1st_pending_measurement_30_min()
                 continue
             else:
                 break
@@ -276,7 +276,7 @@ else:
     print("\nFailed to publish mqtt message.")
     print("\nSaving detection in database to send later, when conection available.")
     #save measurement in database
-    store_pending_measurement(dataAtual_unix, detected_devices)
+    store_pending_measurement_30_min(dataAtual_unix, detected_devices)
 
 cwifi.close()
 connwifi.close()
