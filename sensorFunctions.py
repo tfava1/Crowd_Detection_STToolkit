@@ -269,8 +269,6 @@ def config_influx():
     print("------------------------------------------------------------------")
 
     cloudServerIPAddress = input("Cloud Server IP Address: ").strip()
-    while validate_IP_address(cloudServerIPAddress) is not True:
-        cloudServerIPAddress = input("Cloud Server IP Address: ").strip()
     influxDB_Org_Name = input("InfluxDB Organization name: ").strip()
     influxDB_Bucket = input("InfluxDB Bucket name: ").strip()
     authorization_Token = input("Authorization token: ").strip()
