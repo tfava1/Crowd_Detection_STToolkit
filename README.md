@@ -1,4 +1,4 @@
-# Crowd_Detection_STToolkit
+# Crowd Sensor Legacy
 
 This code has:
 - (Extra) Count upload every 30 min of the last 30 min via `sendCrowdingData_30min.py`
